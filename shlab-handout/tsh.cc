@@ -182,7 +182,16 @@ int builtin_cmd(char **argv)
 {
   string cmd(argv[0]);
   if(cmd == "quit")
+  {
     raise(SIGQUIT);
+    return 1;
+  }
+
+  if(cmd == "jobs")
+  {
+    listjobs(jobs);
+    return 1;
+  }
   else
     return 0;     /* not a builtin command */
 }
@@ -231,6 +240,9 @@ void do_bgfg(char **argv)
   // your benefit.
   //
   string cmd(argv[0]);
+
+  //if(cmd == "bg")
+ // else if (cmd == "fg")
 
   return;
 }
