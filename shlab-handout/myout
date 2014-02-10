@@ -1,0 +1,216 @@
+./sdriver.pl -t trace01.txt -s ./tsh -a "-p"
+#
+# trace01.txt - Properly terminate on EOF.
+#
+./sdriver.pl -t trace02.txt -s ./tsh -a "-p"
+#
+# trace02.txt - Process builtin quit command.
+#
+./sdriver.pl -t trace03.txt -s ./tsh -a "-p"
+#
+# trace03.txt - Run a foreground job.
+#
+tsh> quit
+./sdriver.pl -t trace04.txt -s ./tsh -a "-p"
+#
+# trace04.txt - Run a background job.
+#
+tsh> ./myspin 1 &
+./sdriver.pl -t trace05.txt -s ./tsh -a "-p"
+#
+# trace05.txt - Process jobs builtin command.
+#
+tsh> ./myspin 2 &
+tsh> ./myspin 3 &
+tsh> jobs
+[1] (2845) Running ./myspin 2 &
+[2] (2847) Running ./myspin 3 &
+./sdriver.pl -t trace06.txt -s ./tsh -a "-p"
+#
+# trace06.txt - Forward SIGINT to foreground job.
+#
+tsh> ./myspin 4
+./sdriver.pl -t trace07.txt -s ./tsh -a "-p"
+#
+# trace07.txt - Forward SIGINT only to foreground job.
+#
+tsh> ./myspin 4 &
+tsh> ./myspin 5
+tsh> jobs
+./sdriver.pl -t trace08.txt -s ./tsh -a "-p"
+#
+# trace08.txt - Forward SIGTSTP only to foreground job.
+#
+tsh> ./myspin 4 &
+tsh> ./myspin 5
+tsh> jobs
+./sdriver.pl -t trace09.txt -s ./tsh -a "-p"
+#
+# trace09.txt - Process bg builtin command
+#
+tsh> ./myspin 4 &
+tsh> ./myspin 5
+tsh> jobs
+tsh> bg %2
+%2: No such job
+tsh> jobs
+./sdriver.pl -t trace10.txt -s ./tsh -a "-p"
+#
+# trace10.txt - Process fg builtin command. 
+#
+tsh> ./myspin 4 &
+tsh> fg %1
+tsh> jobs
+tsh> fg %1
+%1: No such job
+tsh> jobs
+./sdriver.pl -t trace11.txt -s ./tsh -a "-p"
+#
+# trace11.txt - Forward SIGINT to every process in foreground process group
+#
+tsh> ./mysplit 4
+tsh> /bin/ps a
+  PID TTY      STAT   TIME COMMAND
+  903 tty4     Ss+    0:00 /sbin/getty -8 38400 tty4
+  906 tty5     Ss+    0:00 /sbin/getty -8 38400 tty5
+  909 tty2     Ss+    0:00 /sbin/getty -8 38400 tty2
+  911 tty3     Ss+    0:00 /sbin/getty -8 38400 tty3
+  913 tty6     Ss+    0:00 /sbin/getty -8 38400 tty6
+ 1421 tty1     Ss+    0:00 /sbin/getty -8 38400 tty1
+ 2498 pts/0    Ss     0:00 -bash
+ 2825 pts/0    S+     0:00 make tests
+ 2889 pts/0    S+     0:00 /bin/sh -c ./sdriver.pl -t trace11.txt -s ./tsh -a "-p"
+ 2890 pts/0    S+     0:00 /usr/bin/perl ./sdriver.pl -t trace11.txt -s ./tsh -a -p
+ 2891 pts/0    R+     0:04 ./tsh -p
+ 2896 pts/0    R      0:00 /bin/ps a
+./sdriver.pl -t trace12.txt -s ./tsh -a "-p"
+#
+# trace12.txt - Forward SIGTSTP to every process in foreground process group
+#
+tsh> ./mysplit 4
+tsh> jobs
+tsh> /bin/ps a
+  PID TTY      STAT   TIME COMMAND
+  903 tty4     Ss+    0:00 /sbin/getty -8 38400 tty4
+  906 tty5     Ss+    0:00 /sbin/getty -8 38400 tty5
+  909 tty2     Ss+    0:00 /sbin/getty -8 38400 tty2
+  911 tty3     Ss+    0:00 /sbin/getty -8 38400 tty3
+  913 tty6     Ss+    0:00 /sbin/getty -8 38400 tty6
+ 1421 tty1     Ss+    0:00 /sbin/getty -8 38400 tty1
+ 2498 pts/0    Ss     0:00 -bash
+ 2825 pts/0    S+     0:00 make tests
+ 2897 pts/0    S+     0:00 /bin/sh -c ./sdriver.pl -t trace12.txt -s ./tsh -a "-p"
+ 2898 pts/0    S+     0:00 /usr/bin/perl ./sdriver.pl -t trace12.txt -s ./tsh -a -p
+ 2899 pts/0    R+     0:04 ./tsh -p
+ 2905 pts/0    R      0:00 /bin/ps a
+./sdriver.pl -t trace13.txt -s ./tsh -a "-p"
+#
+# trace13.txt - Restart every stopped process in process group
+#
+tsh> ./mysplit 4
+tsh> jobs
+tsh> /bin/ps a
+  PID TTY      STAT   TIME COMMAND
+  903 tty4     Ss+    0:00 /sbin/getty -8 38400 tty4
+  906 tty5     Ss+    0:00 /sbin/getty -8 38400 tty5
+  909 tty2     Ss+    0:00 /sbin/getty -8 38400 tty2
+  911 tty3     Ss+    0:00 /sbin/getty -8 38400 tty3
+  913 tty6     Ss+    0:00 /sbin/getty -8 38400 tty6
+ 1421 tty1     Ss+    0:00 /sbin/getty -8 38400 tty1
+ 2498 pts/0    Ss     0:00 -bash
+ 2825 pts/0    S+     0:00 make tests
+ 2906 pts/0    S+     0:00 /bin/sh -c ./sdriver.pl -t trace13.txt -s ./tsh -a "-p"
+ 2907 pts/0    S+     0:00 /usr/bin/perl ./sdriver.pl -t trace13.txt -s ./tsh -a -p
+ 2908 pts/0    R+     0:04 ./tsh -p
+ 2914 pts/0    R      0:00 /bin/ps a
+tsh> fg %1
+%1: No such job
+tsh> /bin/ps a
+  PID TTY      STAT   TIME COMMAND
+  903 tty4     Ss+    0:00 /sbin/getty -8 38400 tty4
+  906 tty5     Ss+    0:00 /sbin/getty -8 38400 tty5
+  909 tty2     Ss+    0:00 /sbin/getty -8 38400 tty2
+  911 tty3     Ss+    0:00 /sbin/getty -8 38400 tty3
+  913 tty6     Ss+    0:00 /sbin/getty -8 38400 tty6
+ 1421 tty1     Ss+    0:00 /sbin/getty -8 38400 tty1
+ 2498 pts/0    Ss     0:00 -bash
+ 2825 pts/0    S+     0:00 make tests
+ 2906 pts/0    S+     0:00 /bin/sh -c ./sdriver.pl -t trace13.txt -s ./tsh -a "-p"
+ 2907 pts/0    S+     0:00 /usr/bin/perl ./sdriver.pl -t trace13.txt -s ./tsh -a -p
+ 2908 pts/0    R+     0:04 ./tsh -p
+ 2917 pts/0    R      0:00 /bin/ps a
+./sdriver.pl -t trace14.txt -s ./tsh -a "-p"
+#
+# trace14.txt - Simple error handling
+#
+tsh> ./bogus
+tsh> ./myspin 4 &
+tsh> fg
+fg command requires PID or %jobid argument
+tsh> bg
+bg command requires PID or %jobid argument
+tsh> fg a
+fg: argument must be a PID or %jobid
+tsh> bg a
+bg: argument must be a PID or %jobid
+tsh> fg 9999999
+(9999999): No such process
+tsh> bg 9999999
+(9999999): No such process
+tsh> fg %2
+%2: No such job
+tsh> fg %1
+tsh> bg %2
+%2: No such job
+tsh> bg %1
+%1: No such job
+tsh> jobs
+tsh> ./myspin 4 &
+tsh> fg
+fg command requires PID or %jobid argument
+tsh> bg
+bg command requires PID or %jobid argument
+tsh> fg a
+fg: argument must be a PID or %jobid
+tsh> bg a
+bg: argument must be a PID or %jobid
+tsh> fg 9999999
+(9999999): No such process
+tsh> bg 9999999
+(9999999): No such process
+tsh> fg %2
+%2: No such job
+tsh> fg %1
+./sdriver.pl -t trace15.txt -s ./tsh -a "-p"
+#
+# trace15.txt - Putting it all together
+#
+tsh> ./bogus
+tsh> ./myspin 10
+tsh> ./myspin 3 &
+tsh> ./myspin 4 &
+tsh> jobs
+[1] (2954) Running ./myspin 3 &
+[2] (2956) Running ./myspin 4 &
+tsh> fg %1
+tsh> jobs
+[2] (2956) Running ./myspin 4 &
+tsh> bg %3
+%3: No such job
+tsh> bg %1
+%1: No such job
+tsh> jobs
+[2] (2956) Running ./myspin 4 &
+tsh> fg %1
+%1: No such job
+tsh> quit
+tsh> ./myspin 10
+./sdriver.pl -t trace16.txt -s ./tsh -a "-p"
+#
+# trace16.txt - Tests whether the shell can handle SIGTSTP and SIGINT
+#     signals that come from other processes instead of the terminal.
+#
+tsh> ./mystop 2
+tsh> jobs
+tsh> ./myint 2
+all time

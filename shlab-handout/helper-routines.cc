@@ -12,7 +12,7 @@
  ***********************/
 
 /*
- * usage - print a help message
+ * usage - print a help m:xessage
  */
 void usage(void) 
 {
