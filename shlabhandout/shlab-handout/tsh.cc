@@ -162,49 +162,43 @@ void eval(char *cmdline)
   // in background mode or FALSE if it should run in FG
   //
   int bg = parseline(cmdline, argv); 
-  printf("BG is %d \n", bg);
   if (argv[0] == NULL)  
     return;   /* ignore empty lines */
-  if(!builtin_cmd(argv))
+  if (!builtin_cmd(argv))
   {
     sigset_t sigmask;
     pid_t pid;
-      sigemptyset(&sigmask);
-      sigaddset(&sigmask, SIGCHLD);
-      sigprocmask(SIG_BLOCK, &sigmask, NULL);
-      pid = fork();
-      if(pid == -1)
+    sigemptyset(&sigmask);
+    sigaddset(&sigmask, SIGCHLD);
+    sigprocmask(SIG_BLOCK, &sigmask, NULL);
+    pid = fork();
+    if (pid == 0)
+    {
+      sigprocmask(SIG_UNBLOCK, &sigmask, NULL);
+      setpgid(0,0);
+      if (execv(argv[0], argv) < 0)
       {
-        printf("(%s): Forking Error\n", argv[0]);
-        sigprocmask(SIG_UNBLOCK, &sigmask, NULL);
+        printf("%s: Command not found\n", argv[0]);
+        exit(1);
       }
-      else if (pid == 0) //fork returns 0 to the child. This is whrere the child will resume.
+      exit(0);
+    }
+    else
+    {
+      if (!bg)
       {
-        setpgid(0,0);
+        addjob(jobs, pid, FG, cmdline);
         sigprocmask(SIG_UNBLOCK, &sigmask, NULL);
-        if (execv(argv[0], argv) < 0)
-          printf("%s: Command not found\n", argv[0]);
-        exit(0);
+        waitfg(pid);
       }
       else
       {
-        //not a background job so after adding the job to the list and unblocking we wait for 
-        //it to complete before continuing with the parent.
-        if(!bg){
-          addjob(jobs, pid, FG, cmdline);
-          printf("not bg\n %s", cmdline);
-          sigprocmask(SIG_UNBLOCK, &sigmask, NULL);
-          waitfg(pid);
-        }//it is a background job so add the job with the correct state and unblock the child.
-        else{
-          addjob(jobs, pid, BG, cmdline);
-          printf("bg\n %s", cmdline);
-          printf("[%d] (%d) %s", pid2jid(pid), pid, cmdline);
-          sigprocmask(SIG_UNBLOCK, &sigmask, NULL);
-        }
+        addjob(jobs, pid, BG, cmdline);
+        sigprocmask(SIG_UNBLOCK, &sigmask, NULL);
+        printf("[%d] (%d) %s", pid2jid(pid), pid, cmdline);
       }
+    }
   }
-  return;
 }
 
 
@@ -222,6 +216,7 @@ int builtin_cmd(char **argv)
   if(cmd == "quit")
   {
     exit(0);
+    return 1;
   }
   else if(cmd == "jobs")
   {
@@ -233,8 +228,8 @@ int builtin_cmd(char **argv)
     do_bgfg(argv);
     return 1;
   }
-  else
-    return 0;     /* not a builtin command */
+
+  return 0;     /* not a builtin command */
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -281,17 +276,17 @@ void do_bgfg(char **argv)
   // your benefit.
   //
   string cmd(argv[0]);
-
-  kill(-(jobp->pid), SIGCONT); //should this kill command go to the job group?
+  kill(-(jobp->pid), SIGCONT); //SIGCONT will restart the process. if it is stopped it will start. send to the group with -pid
 
   if (cmd == "fg")
   {
-      jobp->state = FG;
-      waitfg(jobp->pid);
+      jobp->state = FG;//change the job state
+      waitfg(jobp->pid);//wait to do your duties until the FG job has finished.
   }
   else 
   {
-    jobp->state = BG;
+    jobp->state = BG; //job is in the background so do your thing print out the stuff.
+    printf("[%d] (%d) %s", jobp->jid, jobp->pid, jobp->cmdline);
   }
   return;
 }
@@ -302,11 +297,8 @@ void do_bgfg(char **argv)
 //
 void waitfg(pid_t pid)
 {
-  //****does this work??
-  for(;;){
-    if(pid != fgpid(jobs))
-      break;
-    sleep(0);
+  while(pid == fgpid(jobs)){ //wait until the fg job is done before you can return to your duties.
+    sleep(1);
   }
   return;
 }
@@ -329,14 +321,27 @@ void sigchld_handler(int sig)
 {
   pid_t pid;
   int status;
-    while ((pid = waitpid(-1, &status, WNOHANG|WUNTRACED)) > 0) /* Reap a zombie child */
+  while ((pid = waitpid(-1, &status, WNOHANG|WUNTRACED)) > 0) /* Reap a zombie child */
+  { 
+    if (WIFSIGNALED(status)) //job has been terminated by some signal, delete the job from the job list.
     {
-      deletejob(jobs, pid); /* Delete the child from the job list */
-    //****do i need to check for more here. Like WIFSIGNALED/WIFEXITED/WIFSTOP?
+      deletejob(jobs, pid);
+      fprintf(stderr, "Job [%d] (%d) terminated by signal %d\n", pid2jid(pid), pid, WTERMSIG(status));
     }
-    if (errno != ECHILD)
-      unix_error("waitpid error");
-  exit(0);
+    else if (WIFSTOPPED(status)) // job has been stopped by another process. Do some accounting and make that process state stopped.
+    {
+      getjobpid(jobs, pid)->state = ST;
+      fprintf(stderr, "Job [%d] (%d) stopped by signal %d\n", pid2jid(pid), pid, WSTOPSIG(status));
+    }
+    else if (WIFEXITED(status)) //job exited normally. all you have to do is delete it.
+    {
+       deletejob(jobs, pid);
+    }
+  } 
+  /*if (errno != ECHILD)
+    unix_error("waitpid error");
+  return;
+  */
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -350,8 +355,8 @@ void sigint_handler(int sig)
   pid_t pid;
   pid = fgpid(jobs); //get the fg job from the jobs list
   if(pid != 0) //if fgpid is 0 then there is no fg job
-    kill(-pid, SIGINT); //kill fgpid and all children of fgpid using SIGINT
-  //****Do i need to delete the job here?
+  kill(-pid, SIGINT); //pass SIGINT to pid group
+  
   return;
 }
 
@@ -364,10 +369,10 @@ void sigint_handler(int sig)
 void sigtstp_handler(int sig) 
 {
   pid_t pid;
-  pid = fgpid(jobs); 
+  pid = fgpid(jobs); // if pid is 0 then there are no FG jobs in the job list.
   if(pid != 0)
-    kill(-pid, SIGTSTP);
-  //****Do I also need to set state to ST??
+  kill(-pid, SIGTSTP); //pass sigstp to group of pid
+  
   return;
 }
 
